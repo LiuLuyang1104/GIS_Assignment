@@ -38,12 +38,17 @@ Reception_Obese_rate<-data.frame(lapply(obesity$reception_obese_rate,
                                         function(x) as.numeric(sub("%", "", x))/100) )
 Year6_Obese_rate<-data.frame(lapply(obesity$year6_obese_rate,
                                     function(x) as.numeric(sub("%", "", x))/100) )
-obesity<-obesity%>%mutate(t(Childhood_Obesity),t(Reception_Obese_rate),
-                          t(Year6_Obese_rate))
+
 #descriptive analysis
 #1. general analysis
-#mean,median,max,min
-#frequency distribution
+summary(LondonWardsObesity$childhood_obesity)
+summary(LondonWardsObesity$year6_obese_rate)
+summary(LondonWardsObesity$reception_obese_rate)
+#boxplot
+child_age_groups<-data.frame("groups"=c("mean childhood obesity","Reception year obesity","Year 6 obesity"),
+"Obesity_rate"=c(LondonWardsObesity$childhood_obesity,LondonWardsObesity$reception_obese_rate,LondonWardsObesity$year6_obese_rate))
+p<- ggplot(child_age_groups, aes(x = groups, y = Obesity_rate)) +geom_boxplot(fill = fill, colour = line)+ scale_y_continuous(breaks = seq(0, 0.3, 0.05))+ggtitle("Boxplot of childhood obesity rate by age groups")+theme(plot.title = element_text(hjust = 0.5))
+#Histogram
 Frequency_distribution<-ggplot(data=LondonWardsObesity,aes(x=childhood_obesity)) +
   geom_histogram(binwidth=5,fill="lightblue", breaks =c(0,0.03,0.06,0.09,0.12,0.15,0.18,0.21,0.24,0.27,0.3),
                  color="black", alpha=0.5)+
@@ -72,13 +77,13 @@ compared_distribution<-ggplot(LondonWardsObesity) +
           axis.line = element_line(colour = "black")) +
   theme(plot.title = element_text(hjust = 0.5))
 #spatial distribution
-tm_shape(LondonWardsObesity_whole) +
-  tm_polygons("reception_obese_rate",
-              style="fixed",
-              breaks=c(0.05,0.1,0.15,0.2),
-              palette=GIColours,
-              midpoint=NA,
-              title="Gi*, Obesity in London")
+tm1 <- tm_shape(LondonWardsObesity_whole) +
+  tm_polygons("reception_obese_rate",breaks=c(0,0.11,1),
+              palette="Pastel1")+tm_legend(show=TRUE)+tm_layout(frame=FALSE)+tm_credits("(a)", position=c(0,0.85), size=1.5)
+tm2 <- tm_shape(LondonWardsObesity_whole) +
+  tm_polygons("year6_obese_rate",breaks=c(0,0.23,1),
+              palette="Pastel1")+tm_legend(show=TRUE)+tm_layout(frame=FALSE)+tm_credits("(b)", position=c(0,0.85), size=1.5)
+t=tmap_arrange(tm1, tm2,legend, ncol=2)
 # define a spatial weights matrixweight
 #First calculate the centroids of all Wards in London
 library(spdep)
@@ -131,7 +136,7 @@ as_tibble()
 slice_head(I_local_Obesity, n=5)
 LondonWardsObesity <- LondonWardsObesity %>%mutate(Obesity_I = as.numeric(I_local_Obesity$Ii))
 LondonWardsObesity <- LondonWardsObesity %>%mutate(Obesity_Iz =as.numeric(I_local_Obesity$Z.Ii))
-breaks1<-c(-1000,-2.58,-1.96,-1.65,1.65,1.96,2.58,1000)
+breaks1<-c(-1000,-1.96,-1.65,1.65,1.96,1000)
 MoranColours<- rev(brewer.pal(8, "RdGy"))
 tm_shape(LondonWardsObesity) + tm_polygons("Obesity_Iz",tyle="fixed",
                     breaks=breaks1,
@@ -153,6 +158,81 @@ GIColours<- rev(brewer.pal(8, "RdBu"))
 tm_shape(LondonWardsObesity) +
   tm_polygons("density_G",
               style="fixed",
+
+              breaks=breaks1,
+              palette=GIColours,
+              midpoint=NA,
+              title="Gi*, Obesity in London")
+# reception year
+#local Moran's
+I_local_reception_Obesity <- LondonWardsObesity %>%
+  pull(reception_obese_rate) %>%
+  as.vector()%>%
+  localmoran(., spatial_weights)%>%
+  as_tibble()
+slice_head(I_local_reception_Obesity, n=5)
+LondonWardsObesity <- LondonWardsObesity %>%mutate(reception_Obesity_I = as.numeric(I_local_reception_Obesity$Ii))
+LondonWardsObesity <- LondonWardsObesity %>%mutate(reception_Obesity_Iz =as.numeric(I_local_reception_Obesity$Z.Ii))
+breaks1<-c(-1000,-1.96,-1.65,1.65,1.96,1000)
+MoranColours<- rev(brewer.pal(8, "RdGy"))
+tm_shape(LondonWardsObesity) + tm_polygons("reception_Obesity_Iz",tyle="fixed",
+                                           breaks=breaks1,
+                                           palette=MoranColours,
+                                           midpoint=NA,
+                                           title="Local Moran's I, Obesity in London")
+#local Gi
+Gi_local_reception_Obesity <- LondonWardsObesity %>%
+  pull(reception_obese_rate) %>%
+  as.vector()%>%
+  localG(.,spatial_weights)
+
+head(Gi_local_reception_Obesity)
+LondonWardsObesity <- LondonWardsObesity %>%
+  mutate( reception_Obesity_G= as.numeric(Gi_local_reception_Obesity))
+GIColours<- rev(brewer.pal(8, "RdBu"))
+
+#now plot on an interactive map
+tm_shape(LondonWardsObesity) +
+  tm_polygons("reception_Obesity_G",
+              style="fixed",
+
+              breaks=breaks1,
+              palette=GIColours,
+              midpoint=NA,
+              title="Gi*, Obesity in London")
+# year 6
+#local Moran's
+I_local_year6_Obesity <- LondonWardsObesity %>%
+  pull(year6_obese_rate) %>%
+  as.vector()%>%
+  localmoran(., spatial_weights)%>%
+  as_tibble()
+slice_head(I_local_year6_Obesity, n=5)
+LondonWardsObesity <- LondonWardsObesity %>%mutate(year6_Obesity_I = as.numeric(I_local_year6_Obesity$Ii))
+LondonWardsObesity <- LondonWardsObesity %>%mutate(year6_Obesity_Iz =as.numeric(I_local_year6_Obesity$Z.Ii))
+breaks1<-c(-1000,-1.96,-1.65,1.65,1.96,1000)
+MoranColours<- rev(brewer.pal(8, "RdGy"))
+tm_shape(LondonWardsObesity) + tm_polygons("year6_Obesity_Iz",tyle="fixed",
+                                           breaks=breaks1,
+                                           palette=MoranColours,
+                                           midpoint=NA,
+                                           title="Local Moran's I, Obesity in London")
+#local Gi
+Gi_local_year6_Obesity <- LondonWardsObesity %>%
+  pull(year6_obese_rate) %>%
+  as.vector()%>%
+  localG(.,spatial_weights)
+
+head(Gi_local_year6_Obesity)
+LondonWardsObesity <- LondonWardsObesity %>%
+  mutate( year6_Obesity_G= as.numeric(Gi_local_year6_Obesity))
+GIColours<- rev(brewer.pal(8, "RdBu"))
+
+#now plot on an interactive map
+tm_shape(LondonWardsObesity) +
+  tm_polygons("year6_Obesity_G",
+              style="fixed",
+
               breaks=breaks1,
               palette=GIColours,
               midpoint=NA,
