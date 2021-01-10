@@ -1,6 +1,4 @@
-
-# Identification of “hot spots” of childhood obesity in London
-## library packages
+# library packages
 library(spatstat)
 library(sp)
 library(rgeos)
